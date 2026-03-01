@@ -122,10 +122,10 @@ class ListViewRemoteViewsFactory(
 
     private val tasks = mutableListOf<Task>()
 
-    override fun onCreate() {}
+    override fun onCreate() = Unit
 
     override fun onDataSetChanged() {
-        tasks.clear() // Add this!
+        val newTasks = mutableListOf<Task>()
         val sharedPrefs = HomeWidgetPlugin.getData(context)
         val latestTasksJson = sharedPrefs.getString("tasks", "")
 
@@ -133,15 +133,18 @@ class ListViewRemoteViewsFactory(
             try {
                 val jsonArray = OrgJSONArray(latestTasksJson)
                 for (i in 0 until jsonArray.length()) {
-                    tasks.add(Task.fromJson(jsonArray.getJSONObject(i)))
+                    newTasks.add(Task.fromJson(jsonArray.getJSONObject(i)))
                 }
             } catch (e: JSONException) {
                 e.printStackTrace()
             }
         }
+        // Atomic swap
+        tasks.clear()
+        tasks.addAll(newTasks)
     }
 
-    override fun onDestroy() {}
+    override fun onDestroy() = Unit
 
     override fun getCount(): Int = tasks.size
 
@@ -168,7 +171,6 @@ class ListViewRemoteViewsFactory(
         return layoutId
     }
     fun getDotIdByPriority(p: String): Int {
-        println("PRIORITY: " + p)
         if (p.equals("L")) return R.drawable.low_priority_dot
         if (p.equals("M")) return R.drawable.mid_priority_dot
         if (p.equals("H")) return R.drawable.high_priority_dot
@@ -176,6 +178,13 @@ class ListViewRemoteViewsFactory(
     }
 
     override fun getViewAt(position: Int): RemoteViews {
+        // Safe guard against Android out-of-bounds scrolling crashes
+        if (position !in tasks.indices) {
+            return RemoteViews(context.packageName, getListItemLayoutIdForR1()).apply {
+                setTextViewText(R.id.tv, "Loading...")
+            }
+        }
+        
         val task = tasks[position]
         if (task.uuid.equals("NO_TASK"))
                 return RemoteViews(context.packageName, getListItemLayoutIdForR1()).apply {

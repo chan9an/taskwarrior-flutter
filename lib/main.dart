@@ -27,15 +27,17 @@ DynamicLibrary loadNativeLibrary() {
 }
 
 void main() async {
-  debugPrint("🚀 BOOT: main() started");
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Move the logger override ABOVE the first boot print!
   debugPrint = (String? message, {int? wrapWidth}) {
     if (message != null) {
       debugPrintSynchronously(message, wrapWidth: wrapWidth);
       _logDatabaseHelper.insertLog(message);
     }
   };
+
+  debugPrint("🚀 BOOT: main() started");
 
   loadNativeLibrary();
   await RustLib.init();
@@ -45,7 +47,7 @@ void main() async {
   // fix: Actually await the service initialization so the OS intent is caught BEFORE runApp.
   await Get.putAsync<DeepLinkService>(() async {
     final service = DeepLinkService();
-    await service.init(); 
+    await service.init();
     return service;
   }, permanent: true);
   runApp(
@@ -56,7 +58,10 @@ void main() async {
       initialRoute: AppPages.INITIAL,
       unknownRoute: AppPages.routes.firstWhere(
         (page) => page.name == AppPages.INITIAL,
-        orElse: () => AppPages.routes.first,
+        orElse: () {
+          debugPrint("⚠️ Unknown route requested, falling back to default");
+          return AppPages.routes.first;
+        },
       ),
       getPages: AppPages.routes,
       themeMode: AppSettings.isDarkMode ? ThemeMode.dark : ThemeMode.light,

@@ -1,3 +1,4 @@
+import 'dart:async'; // Add this import at the top
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_links/app_links.dart';
@@ -7,7 +8,9 @@ import 'package:taskwarrior/app/routes/app_pages.dart';
 
 class DeepLinkService extends GetxService {
   late AppLinks _appLinks;
-  String? queuedUri;
+  String? _queuedUri; // Made private
+  String? get queuedUri => _queuedUri; // Added getter
+  StreamSubscription<Uri>? _linkSubscription; // Added stream subscription
 
   Future<void> init() async {
     _appLinks = AppLinks();
@@ -15,17 +18,25 @@ class DeepLinkService extends GetxService {
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
-        queuedUri = initialUri.toString();
-        debugPrint('🔗 INITIAL LINK QUEUED: $queuedUri');
+        _queuedUri = initialUri.toString();
+        debugPrint('🔗 INITIAL LINK QUEUED: $_queuedUri');
       }
     } catch (e) {
-      debugPrint('Deep link init error (safe to ignore on unsupported platforms): $e');
+      debugPrint('Deep link init error: $e');
     }
 
-    _appLinks.uriLinkStream.listen((uri) {
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       debugPrint('🔗 LINK RECEIVED: $uri');
       _handleWidgetUri(uri);
+    }, onError: (err) {
+      debugPrint('🔗 LINK STREAM ERROR: $err');
     });
+  }
+
+  @override
+  void onClose() {
+    _linkSubscription?.cancel();
+    super.onClose();
   }
 
   void _handleWidgetUri(Uri uri) {
@@ -33,15 +44,19 @@ class DeepLinkService extends GetxService {
       _executeAction(uri, Get.find<HomeController>());
     } else {
       debugPrint("⏳ HomeController not ready. Queuing action.");
-      queuedUri = uri.toString();
+      _queuedUri = uri.toString();
     }
   }
 
   void consumePendingActions(HomeController controller) {
-    if (queuedUri != null) {
+    if (_queuedUri != null) {
       debugPrint("🚀 Executing queued action...");
-      _executeAction(Uri.parse(queuedUri!), controller);
-      queuedUri = null;
+      try {
+        _executeAction(Uri.parse(_queuedUri!), controller);
+      } catch (e) {
+        debugPrint("🔗 FAILED TO PARSE URI: $_queuedUri - Error: $e");
+      }
+      _queuedUri = null;
     }
   }
 

@@ -23,25 +23,27 @@ class SplashController extends GetxController {
   Profiles get _profiles => Profiles(baseDirectory.value);
 
   @override
-  void onInit() async {
+  void onInit() {
     debugPrint("🚀 BOOT: SplashController.onInit()");
     super.onInit();
+  }
 
-    // If we don't, HomeController will boot blind and crash trying to read empty paths.
+  @override
+  void onReady() async {
+    super.onReady();
+
     await initBaseDir();
     _checkProfiles();
     profilesMap.value = _profiles.profilesMap();
     currentProfile.value = _profiles.getCurrentProfile()!;
 
-    // FIX 2: NOW we check if we should bypass the slow UI stuff.
     final deepLinkService = Get.find<DeepLinkService>();
     if (deepLinkService.queuedUri != null) {
       debugPrint("🚀 TRACE: Bypassing Splash routing for queued URI");
       Get.offNamed(Routes.HOME);
-      return; // Skip the slow app updates and onboarding checks
+      return;
     }
 
-    // Normal boot sequence for people just opening the app normally
     await checkForUpdate();
     sendToNextPage();
   }

@@ -129,17 +129,15 @@ class HomeController extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    // Automatically check for any queued Deep Links when Home spins up.
-    // We delay slightly to ensure the Navigator route swap finishes first, avoiding widget tree lock.
-    Future.delayed(const Duration(milliseconds: 50), () {
+    // Replaced 50ms delay with a secure PostFrameCallback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (isClosed) return;
-      if (Get.isRegistered<DeepLinkService>()) {
-        final deepLinkService = Get.find<DeepLinkService>();
-        if (deepLinkService.queuedUri != null) {
-          debugPrint(
-              "TRACE: HomeController.onReady() consuming deferred queue!");
-          deepLinkService.consumePendingActions(this);
-        }
+
+      final deepLinkService = Get.find<DeepLinkService>();
+      if (deepLinkService.queuedUri != null) {
+        debugPrint(
+            "🚀 TRACE: HomeController.onReady() consuming deferred queue!");
+        deepLinkService.consumePendingActions(this);
       }
     });
   }
