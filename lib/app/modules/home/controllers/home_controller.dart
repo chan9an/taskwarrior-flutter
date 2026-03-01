@@ -12,8 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taskwarrior/app/models/filters.dart';
 
 import 'package:taskwarrior/app/models/json/task.dart';
-import 'package:taskwarrior/app/models/storage.dart';
 import 'package:taskwarrior/app/models/storage/client.dart';
+import 'package:taskwarrior/app/models/storage.dart';
 import 'package:taskwarrior/app/models/tag_meta_data.dart';
 import 'package:taskwarrior/app/modules/home/controllers/widget.controller.dart';
 import 'package:taskwarrior/app/modules/splash/controllers/splash_controller.dart';
@@ -70,6 +70,7 @@ class HomeController extends GetxController {
 
   @override
   void onInit() {
+    debugPrint("🚀 BOOT: HomeController.onInit()");
     super.onInit();
     storage = Storage(
       Directory(
@@ -78,6 +79,7 @@ class HomeController extends GetxController {
     );
     serverCertExists = RxBool(storage.guiPemFiles.serverCertExists());
     addListenerToScrollController();
+
     _profileSet();
     loadDelayTask();
     initLanguageAndDarkMode();
@@ -127,9 +129,19 @@ class HomeController extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    if (Get.isRegistered<DeepLinkService>()) {
-      Get.find<DeepLinkService>().consumePendingActions(this);
-    }
+    // Automatically check for any queued Deep Links when Home spins up.
+    // We delay slightly to ensure the Navigator route swap finishes first, avoiding widget tree lock.
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (isClosed) return;
+      if (Get.isRegistered<DeepLinkService>()) {
+        final deepLinkService = Get.find<DeepLinkService>();
+        if (deepLinkService.queuedUri != null) {
+          debugPrint(
+              "TRACE: HomeController.onReady() consuming deferred queue!");
+          deepLinkService.consumePendingActions(this);
+        }
+      }
+    });
   }
 
   Future<List<String>> getUniqueProjects() async {
@@ -577,8 +589,7 @@ class HomeController extends GetxController {
         await synchronize(context, false);
       }
       if (context.mounted) {
-        final tColors =
-            Theme.of(context).extension<TaskwarriorColorTheme>()!;
+        final tColors = Theme.of(context).extension<TaskwarriorColorTheme>()!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

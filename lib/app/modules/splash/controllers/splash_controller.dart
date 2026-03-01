@@ -13,6 +13,7 @@ import 'package:taskwarrior/app/routes/app_pages.dart';
 import 'package:taskwarrior/app/utils/taskchampion/credentials_storage.dart';
 import 'package:taskwarrior/app/utils/taskfunctions/profiles.dart';
 import 'package:taskwarrior/app/v3/models/task.dart';
+import 'package:taskwarrior/app/services/deep_link_service.dart';
 
 class SplashController extends GetxController {
   late Rx<Directory> baseDirectory = Directory('').obs;
@@ -23,14 +24,26 @@ class SplashController extends GetxController {
 
   @override
   void onInit() async {
+    debugPrint("🚀 BOOT: SplashController.onInit()");
     super.onInit();
+
+    // If we don't, HomeController will boot blind and crash trying to read empty paths.
+    await initBaseDir();
+    _checkProfiles();
+    profilesMap.value = _profiles.profilesMap();
+    currentProfile.value = _profiles.getCurrentProfile()!;
+
+    // FIX 2: NOW we check if we should bypass the slow UI stuff.
+    final deepLinkService = Get.find<DeepLinkService>();
+    if (deepLinkService.queuedUri != null) {
+      debugPrint("🚀 TRACE: Bypassing Splash routing for queued URI");
+      Get.offNamed(Routes.HOME);
+      return; // Skip the slow app updates and onboarding checks
+    }
+
+    // Normal boot sequence for people just opening the app normally
     await checkForUpdate();
-    initBaseDir().then((_) {
-      _checkProfiles();
-      profilesMap.value = _profiles.profilesMap();
-      currentProfile.value = _profiles.getCurrentProfile()!;
-      sendToNextPage();
-    });
+    sendToNextPage();
   }
 
   Future<void> initBaseDir() async {
