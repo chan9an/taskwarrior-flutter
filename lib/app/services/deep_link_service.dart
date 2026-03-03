@@ -74,15 +74,17 @@ class DeepLinkService extends GetxService {
       }
     } else if (uri.host == "addclicked") {
       if (Get.context != null) {
-        Get.dialog(
-          Material(
-            child: AddTaskBottomSheet(
-              homeController: controller,
-              forTaskC: isTaskChampion,
-              forReplica: isReplica,
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.dialog(
+            Material(
+              child: AddTaskBottomSheet(
+                homeController: controller,
+                forTaskC: isTaskChampion,
+                forReplica: isReplica,
+              ),
             ),
-          ),
-        );
+          );
+        });
       }
     }
   }
