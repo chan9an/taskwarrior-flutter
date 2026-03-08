@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_links/app_links.dart';
+import 'package:quick_actions/quick_actions.dart';
 import 'package:taskwarrior/app/modules/home/views/add_task_bottom_sheet_new.dart';
 import 'package:taskwarrior/app/modules/home/controllers/home_controller.dart';
 import 'package:taskwarrior/app/routes/app_pages.dart';
@@ -8,19 +10,62 @@ import 'package:taskwarrior/app/routes/app_pages.dart';
 class DeepLinkService extends GetxService {
   late AppLinks _appLinks;
   Uri? _queuedUri;
+  Uri? get queuedUri => _queuedUri;
 
-  @override
-  void onReady() {
-    super.onReady();
-    _initDeepLinks();
-  }
+  final QuickActions _quickActions = const QuickActions();
+  StreamSubscription<Uri>? _linkSubscription;
 
-  void _initDeepLinks() {
+  Future<void> init() async {
     _appLinks = AppLinks();
-    _appLinks.uriLinkStream.listen((uri) {
+
+    await _initQuickActions();
+
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _queuedUri = initialUri;
+        debugPrint('🔗 INITIAL LINK QUEUED: $_queuedUri');
+      }
+    } catch (e) {
+      debugPrint('Deep link init error: $e');
+    }
+
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       debugPrint('🔗 LINK RECEIVED: $uri');
       _handleWidgetUri(uri);
+    }, onError: (err) {
+      debugPrint('🔗 LINK STREAM ERROR: $err');
     });
+  }
+
+  Future<void> _initQuickActions() async {
+    await _quickActions.initialize((String shortcutType) {
+      debugPrint("⚡ SHORTCUT RECEIVED: $shortcutType");
+      if (shortcutType == 'shortcut_add_task') {
+        _handleWidgetUri(Uri.parse('taskwarrior://addclicked'));
+      } else if (shortcutType == 'shortcut_reports') {
+        _handleWidgetUri(Uri.parse('taskwarrior://reports'));
+      }
+    });
+
+    await _quickActions.setShortcutItems(<ShortcutItem>[
+      const ShortcutItem(
+        type: 'shortcut_add_task',
+        localizedTitle: 'Add Task',
+        icon: 'plus',
+      ),
+      const ShortcutItem(
+        type: 'shortcut_reports',
+        localizedTitle: 'Reports',
+        icon: 'report',
+      ),
+    ]);
+  }
+
+  @override
+  void onClose() {
+    _linkSubscription?.cancel();
+    super.onClose();
   }
 
   void _handleWidgetUri(Uri uri) {
@@ -63,6 +108,12 @@ class DeepLinkService extends GetxService {
             ),
           ),
         );
+      }
+    } else if (uri.host == "reports") {
+      if (Get.context != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.toNamed(Routes.REPORTS);
+        });
       }
     }
   }
