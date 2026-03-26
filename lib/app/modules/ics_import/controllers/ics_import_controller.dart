@@ -87,22 +87,26 @@ class IcsImportController extends GetxController {
         final task = parsedTasks[i];
         
         if (isReplica) {
-            await Replica.addTaskToReplica(HashMap<String, dynamic>.from({
+            final result = await Replica.addTaskToReplica(HashMap<String, dynamic>.from({
               "description": task.description,
-              "due": task.due,
+              "due": task.due?.toUtc().toIso8601String(),
               "priority": "M", // Default Medium priority
               "project": task.project,
               "tags": task.tags,
             }));
+            if (result == "err") {
+              debugPrint("Failed to import task: ${task.description}");
+            }
         } else {
-            var rTask = taskParser(task.description)
-                .rebuild((b) => b..due = task.due?.toUtc())
-                .rebuild((p) => p..priority = "M")
-                .rebuild((p) => p..project = task.project);
-             if (task.tags.isNotEmpty) {
-                 rTask = rTask.rebuild((t) => t..tags.replace(task.tags));
-             }
-             homeController.mergeTask(rTask);
+            var rTask = taskParser(task.description).rebuild((b) {
+              b.due = task.due?.toUtc();
+              b.priority = "M";
+              b.project = task.project;
+              if (task.tags.isNotEmpty) {
+                b.tags.replace(task.tags);
+              }
+            });
+            homeController.mergeTask(rTask);
         }
       }
 
