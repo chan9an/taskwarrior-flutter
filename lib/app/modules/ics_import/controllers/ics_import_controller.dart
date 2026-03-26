@@ -47,7 +47,11 @@ class IcsImportController extends GetxController {
       parsedTasks.assignAll(tasks);
 
       // Prevent duplicate imports by default-unchecking tasks that already exist
-      final existingDescriptions = homeController.tasks.map((t) => t.description).toSet();
+      bool isReplica = homeController.taskReplica.value || homeController.taskchampion.value;
+      final existingDescriptions = isReplica 
+          ? homeController.tasksFromReplica.map((t) => t.description).toSet()
+          : homeController.tasks.map((t) => t.description).toSet();
+          
       selectedTasks.assignAll(
         List.generate(tasks.length, (i) => !existingDescriptions.contains(tasks[i].description))
       );
@@ -122,11 +126,13 @@ class IcsImportController extends GetxController {
           }
       }
 
-      Get.back(); 
-      Get.back();  
+      Get.back(); // close the ICS import bottom sheet
+      Get.back(); // close the underlying Add Task bottom sheet
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ICS Tasks gently imported!'))
+      Get.snackbar(
+        'Success',
+        'ICS Tasks imported successfully!',
+        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
       errorMessage.value = "Import failed: $e";
